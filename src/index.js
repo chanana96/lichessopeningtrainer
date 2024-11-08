@@ -1,16 +1,28 @@
 const express = require("express");
-const { streamEvent, sendChallenge, streamGameState } = require("./axios");
+const { streamEvent, sendChallenge } = require("./axios");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const fenCodes = require("./fencodes.json");
+const createApplication = require("./composition");
+const gameRoutes = require("./routes/game.routes");
+const application = createApplication();
+
+const {
+  authMiddleware,
+  errorMiddleware,
+  loggerMiddleware,
+} = require("./middleware");
+
+app.use(loggerMiddleware);
+app.use("/api", authMiddleware);
+app.use(errorMiddleware);
 
 app.use(express.urlencoded({ extended: true }));
-
+app.use("/game", gameRoutes(application.services));
 app.get("/", (req, res) => {
   // Extract gameUrl from the query string, if available
   const gameUrl = req.query.gameUrl;
 
-  // Display the homepage with a clickable link if gameUrl is provided
   res.send(`
     <html>
       <body>
@@ -59,11 +71,9 @@ app.post("/start-challenge", async (req, res) => {
   const playerColorChoice = req.body.color;
   const startingPositionFen = fenCodes[fenCodeKey]?.default || fenCodes.default;
 
-  // Send the challenge and get the game URL
   const gameUrl = await sendChallenge(startingPositionFen, playerColorChoice);
 
   if (gameUrl) {
-    // Redirect to the homepage with the game URL in the query string
     res.redirect(`/?gameUrl=${encodeURIComponent(gameUrl)}`);
   } else {
     res.send("Failed to start challenge. Please try again.");

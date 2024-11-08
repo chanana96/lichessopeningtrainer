@@ -20,6 +20,7 @@ build/
 .vscode/
 .idea/
 Thumbs.db
+copilot-instructions.md
 
 # Temporary files
 *.tmp
