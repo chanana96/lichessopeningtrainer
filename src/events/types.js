@@ -4,7 +4,6 @@ const EVENT_TYPES = {
   CHALLENGE_RECEIVED: "challengeReceived",
   GAME_STARTED: "gameStarted",
   SWITCH_TO_STOCKFISH: "switchToStockfish",
-  GAME_FULL: "gameFull",
   GAME_STATE: "gameState",
   GAME_FINISHED: "gameFinished",
   FIND_MOVE: "findMove",

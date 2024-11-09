@@ -14,9 +14,13 @@ const createLichessApi = ({ axios, config }) => {
         },
         responseType: "stream",
       });
-      return streamReader.readStream(response.data, onEvent, (error) =>
-        console.error("Stream error:", error.message)
-      );
+      return {
+        setLineHandler: (handler) => {
+          return streamReader.readStream(response.data, handler, (error) =>
+            console.error("Stream error:", error.message)
+          );
+        },
+      };
     } catch (error) {
       console.error("Failed to create stream:", error.message);
       throw error;
@@ -36,9 +40,13 @@ const createLichessApi = ({ axios, config }) => {
         }
       );
 
-      return streamReader.readStream(response.data, onEvent, (error) =>
-        console.error("Stream error:", error.message)
-      );
+      return {
+        setLineHandler: (handler) => {
+          return streamReader.readStream(response.data, handler, (error) =>
+            console.error("Stream error:", error.message)
+          );
+        },
+      };
     } catch (error) {
       console.error("Game stream creation failed:", error.message);
       throw error;
@@ -46,7 +54,7 @@ const createLichessApi = ({ axios, config }) => {
   };
   const sendChallenge = async (startingPositionFen, playerColorChoice) => {
     try {
-      await axios.post(
+      const response = await axios.post(
         "https://lichess.org/api/challenge/lobster_bot",
         {
           "clock.limit": 300,
@@ -62,7 +70,7 @@ const createLichessApi = ({ axios, config }) => {
           },
         }
       );
-      return;
+      return response.data.url;
     } catch (error) {
       console.error("Challenge creation failed:", error.message);
       throw error;
@@ -109,11 +117,16 @@ const createLichessApi = ({ axios, config }) => {
       throw error;
     }
   };
-  const makeMove = async (gameId, move) => {
+  const makeMove = async ({ gameId, move }) => {
     try {
+      if (!gameId || !move) {
+        throw new Error(
+          `Invalid move parameters: gameId=${gameId}, move=${move}`
+        );
+      }
       const response = await axios.post(
         `https://lichess.org/api/bot/game/${gameId}/move/${move}`,
-        { gameId, move },
+        { gameId: gameId, move: move },
         {
           headers: {
             Authorization: `Bearer ${config.tokens.bot}`,
@@ -121,10 +134,9 @@ const createLichessApi = ({ axios, config }) => {
           },
         }
       );
-      return response.data;
+      return response;
     } catch (error) {
       console.error("Move execution failed:", error.message);
-      throw error;
     }
   };
   const resign = async (gameId) => {

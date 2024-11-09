@@ -1,4 +1,4 @@
-const getExplorerService = (findMovesApi, eventEmitter, config) => {
+const createExplorerService = ({ findMovesApi, eventEmitter, config }) => {
   const cleanUciCode = async (uciCode) => {
     return uciCode.replace(/ +/g, ",");
   };
@@ -13,7 +13,7 @@ const getExplorerService = (findMovesApi, eventEmitter, config) => {
    * @returns {string}
    * @throws {Error}
    */
-  const getMove = async (moves) => {
+  const getMove = (moves) => {
     try {
       if (!moves || !Array.isArray(moves)) {
         throw new Error("Invalid moves input");
@@ -67,14 +67,6 @@ const getExplorerService = (findMovesApi, eventEmitter, config) => {
    * @param {Array} moves
    * @returns {Promise<string>}
    */
-  // const filterMoves = async (moves) => {
-  //   try {
-  //     return getMove(moves); // Pass the full move objects to getMove
-  //   } catch (error) {
-  //     console.error("Error fetching data:", error.message);
-  //   }
-  // };
-
   /**
    * Gets moves from explorer or falls back to stockfish
    * @param {string} uciCode
@@ -85,33 +77,43 @@ const getExplorerService = (findMovesApi, eventEmitter, config) => {
   const getMoveFromExplorer = async (uciCode, fenCode) => {
     const cleanedUci = uciCode ? await cleanUciCode(uciCode) : undefined;
     const response = await findMovesApi.getExplorerMoves(cleanedUci, fenCode);
-    return response.data.moves;
+    return response.moves;
   };
+
+  const getMoveFromStockfish = async (uciCode, fenCode) => {
+    const arrayedUci = uciCode ? await uciToArray(uciCode) : undefined;
+    const response = await findMovesApi.getStockfishMoves(arrayedUci, fenCode);
+    return response.moves;
+  };
+
   const handleFindMove = async ({ uciCode, fenCode, gameId }) => {
     try {
-      if (config.lichess.useExplorer) {
-        const moves = await getMoveFromExplorer(uciCode, fenCode);
-
-        if (moves.length === 0) {
-          config.lichess.useExplorer = false;
-          eventEmitter.emit(
-            "sendChat",
-            gameId,
-            "No more moves found in the Lichess explorer. Switching to Stockfish analysis."
-          );
-          const move = getMove(uciCode, fenCode);
-          eventEmitter.emit("moveFound", { gameId, move });
-          return;
-        }
-
-        const move = getMove(moves);
+      if (!config.lichess.useExplorer) {
+        const move = await getMoveFromStockfish(uciCode, fenCode);
         eventEmitter.emit("moveFound", { gameId, move });
       }
+
+      const moves = await getMoveFromExplorer(uciCode, fenCode);
+
+      if (moves.length === 0) {
+        config.lichess.useExplorer = false;
+        eventEmitter.emit(
+          "sendChat",
+          gameId,
+          "No more moves found in the Lichess explorer. Switching to Stockfish analysis."
+        );
+        const move = await getMoveFromStockfish(uciCode, fenCode);
+        eventEmitter.emit("moveFound", { gameId, move });
+      }
+
+      const move = getMove(moves);
+      return eventEmitter.emit("moveFound", { gameId, move });
     } catch (error) {
-      console.error("Failed to find move:", error);
+      console.error("Failed to find move:", error.message);
       throw error;
     }
-
-    return { handleFindMove };
   };
+  return { handleFindMove };
 };
+
+module.exports = createExplorerService;

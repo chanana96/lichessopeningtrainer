@@ -19,7 +19,7 @@ const createApplication = () => {
     const explorerService = createExplorerService({
       findMovesApi,
       eventEmitter,
-      config: config.lichess,
+      config: config,
     });
 
     const gameService = createGameService({
@@ -28,22 +28,19 @@ const createApplication = () => {
       config,
     });
 
-    // Event Handlers
     const handlers = createEventHandlers({
       chatService: gameService,
     });
 
     // Register Events
-    eventEmitter.on(EVENT_TYPES.SEND_CHAT, handlers.handleSendChat);
-    eventEmitter.on(EVENT_TYPES.GAME_START, gameService.handleGameStart);
+    // eventEmitter.on(EVENT_TYPES.SEND_CHAT, handlers.handleSendChat);
     eventEmitter.on(
       EVENT_TYPES.CHALLENGE_RECEIVED,
       gameService.handleChallengeReceived
     );
     eventEmitter.on(EVENT_TYPES.GAME_STARTED, gameService.handleGameStarted);
-    eventEmitter.on(EVENT_TYPES.GAME_FULL, gameService.handleGameFull);
     eventEmitter.on(EVENT_TYPES.GAME_STATE, gameService.handleGameState);
-    eventEmitter.on(EVENT_TYPES.GAME_FINISHED, gameService.handleGameFinished);
+    // eventEmitter.on(EVENT_TYPES.GAME_FINISHED, gameService.handleGameFinished);
 
     eventEmitter.on(EVENT_TYPES.FIND_MOVE, explorerService.handleFindMove);
     eventEmitter.on(EVENT_TYPES.MOVE_FOUND, gameService.handleMoveFound);

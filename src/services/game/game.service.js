@@ -1,8 +1,16 @@
-const getGameService = (lichessApi, eventEmitter, config) => {
+const createGameService = ({ lichessApi, eventEmitter, config }) => {
+  const gameData = {
+    id: null,
+    isMyTurn: null,
+    fen: null,
+  };
+
   const startEventStream = async () => {
     try {
       const stream = await lichessApi.streamEvent();
+
       stream.setLineHandler((event) => {
+        console.log(event);
         switch (event.type) {
           case "challenge":
             eventEmitter.emit("challengeReceived", event.challenge.id);
@@ -23,7 +31,10 @@ const getGameService = (lichessApi, eventEmitter, config) => {
   };
   const sendChallenge = async (startingPositionFen, playerColorChoice) => {
     try {
-      const response = await lichessApi.sendChallenge(opponent);
+      const response = await lichessApi.sendChallenge(
+        startingPositionFen,
+        playerColorChoice
+      );
       return response;
     } catch (error) {
       console.error("Failed to send challenge:", error.message);
@@ -39,20 +50,27 @@ const getGameService = (lichessApi, eventEmitter, config) => {
       throw error;
     }
   };
-  const handleGameStarted = async (challengeId) => {
+  const handleGameStarted = async (data) => {
     try {
-      const stream = await lichessApi.streamGame(challengeId);
+      gameData.isMyTurn = data.isMyTurn;
+      gameData.fen = data.fen;
+      gameData.id = data.gameId;
+
+      const stream = await lichessApi.streamGame(data.gameId);
+      if (gameData.isMyTurn) {
+        eventEmitter.emit("findMove", {
+          uciCode: "",
+          fenCode: gameData.fen,
+          gameId: gameData.id,
+        });
+      }
       stream.setLineHandler((event) => {
+        console.log(event.type);
         switch (event.type) {
-          case "gameFull":
-            eventEmitter.emit("gameFull", event.challenge.id);
-            break;
           case "gameState":
-            eventEmitter.emit("gameState", {
-              gameId: event.game.id,
-              isMyTurn: event.game.isMyTurn,
-              fen: event.game.fen,
-            });
+            if (event.status === "started")
+              eventEmitter.emit("gameState", event);
+
             break;
           case "gameFinish":
             eventEmitter.emit("gameFinished", event.challenge.id);
@@ -64,20 +82,25 @@ const getGameService = (lichessApi, eventEmitter, config) => {
       throw error;
     }
   };
-  const handleGameFull = async (event) => {
-    if (event.game.isMyTurn) {
+
+  const handleGameState = async (event) => {
+    if (gameData.isMyTurn) {
       eventEmitter.emit("findMove", {
-        moves: event.state.moves,
-        fen: event.game.fen,
-        gameId: event.game.id,
+        uciCode: event.moves,
+        fenCode: gameData.fen,
+        gameId: gameData.id,
       });
+    } else {
+      gameData.isMyTurn = !gameData.isMyTurn;
+      return;
     }
   };
-
-  const handleMoveFound = async (gameId, move) => {
+  const handleMoveFound = async ({ gameId, move }) => {
     try {
-      const response = await lichessApi.makeMove(gameId, move);
-      return response;
+      const response = await lichessApi.makeMove({ gameId, move });
+      if (response?.data?.ok) {
+        gameData.isMyTurn = !gameData.isMyTurn;
+      }
     } catch (error) {
       console.error("Move execution failed:", error.message);
       throw error;
@@ -87,8 +110,10 @@ const getGameService = (lichessApi, eventEmitter, config) => {
     startEventStream,
     sendChallenge,
     handleChallengeReceived,
-    handleGameFull,
+    handleGameState,
     handleGameStarted,
     handleMoveFound,
   };
 };
+
+module.exports = createGameService;
